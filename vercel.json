@@ -14,7 +14,7 @@
     ],
     "env": {
       "CLIENT_ID": "271962080875-khc6aslq3phrnm9cqgguk37j0funtr7f.apps.googleusercontent.com",
-      "REDIRECT_URI": "https://ram-speech.vercel.app/",
+      "REDIRECT_URI": "https://ram-speech.vercel.app",
       "SHEET_ID": "1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8",
       "SCOPES": "https://www.googleapis.com/auth/spreadsheets",
       "API_KEY": "AIzaSyC5n7h-wuxvKdvP4gXBiSStuU8bFSm4k2U"
