@@ -1,6 +1,6 @@
 // OAuth2
 const CLIENT_ID = '271962080875-khc6aslq3phrnm9cqgguk37j0funtr7f.apps.googleusercontent.com';
-const REDIRECT_URI = 'ram-speech.vercel.app';
+const REDIRECT_URI = 'https://ram-speech.vercel.app/';
 const sheetId = "1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8";
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const API_KEY = 'AIzaSyCugN1kot7Nij2PWhKsP08I6yeHNgsYrQI';
@@ -46,6 +46,7 @@ function handleAuthResponse() {
     const params = new URLSearchParams(window.location.hash.substring(1));
     accessToken = params.get('access_token');
     if (accessToken) {
+        localStorage.setItem('access_token', accessToken);
         console.log("Access Token:", accessToken);
         checkAuthAndLoadData();
     } else {
@@ -55,7 +56,11 @@ function handleAuthResponse() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.location.hash.includes('access_token')) {
+    const savedToken = localStorage.getItem('access_token');
+    if (savedToken) {
+        accessToken = savedToken;
+        checkAuthAndLoadData();
+    } else if (window.location.hash.includes('access_token')) {
         handleAuthResponse();
     } else {
         authenticate();
@@ -70,6 +75,12 @@ function setCategory(category) {
 
 // ฟังก์ชันโหลดข้อมูลจาก Google Sheets
 function loadWordsForMixing() {
+    if (!accessToken) {
+        console.error("Access token ไม่ถูกต้อง! โปรดยืนยันตัวตนใหม่");
+        authenticate();
+        return;
+    }
+
     const wordButtonsContainer = document.getElementById('word-buttons-container');
     if (!wordButtonsContainer) {
         console.error('ไม่พบ container สำหรับปุ่มคำ!');
