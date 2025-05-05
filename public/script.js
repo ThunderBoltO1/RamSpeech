@@ -1,6 +1,6 @@
 // Configuration
 const CLIENT_ID = '271962080875-khc6aslq3phrnm9cqgguk37j0funtr7f.apps.googleusercontent.com';
-const REDIRECT_URI = 'ram-speech.vercel.app';
+const REDIRECT_URI = 'https://ram-speech.vercel.app';
 const SPREADSHEET_ID = '1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const CATEGORY_SHEETS = {
