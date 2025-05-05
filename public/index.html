@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Communication Aid</title>
+    
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- ResponsiveVoice -->
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=YL7PkzaR"></script>
+    
+    <style>
+        body {
+            font-family: 'IBM Plex Sans Thai', 'Sarabun', sans-serif; /* Apply Google Font directly */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-lg">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white py-4 shadow-lg">
+        <h1 class="text-2xl font-bold text-center">ระบบสื่อสารด้วยเสียง</h1>
+        <div class="flex justify-center items-center mt-2">
+            <div id="mix-result" class="bg-blue-700 text-white text-2xl font-bold px-6 py-8 rounded-lg mx-2 shadow-lg">
+                ยังไม่ได้เลือกคำ
+            </div>
+            <div id="mix-controls" class="flex space-x-2"></div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md py-4">
+        <div class="flex justify-center space-x-4">
+            <button data-category="ทั่วไป" class="category-button text-xl px-6 py-4 rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all">
+                ทั่วไป
+            </button>
+            <button data-category="ความต้องการ" class="category-button text-xl px-6 py-4 rounded-lg bg-green-100 text-green-800 hover:bg-green-200 transition-all">
+                ความต้องการ
+            </button>
+            <button data-category="คลัง" class="category-button text-xl px-6 py-4 rounded-lg bg-purple-100 text-purple-800 hover:bg-purple-200 transition-all">
+                คลังคำ
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4">
+        <div id="button-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+        <div id="selected-words-container" class="mt-4"></div>
+    </main>
+
+    <!-- Modals -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg p-6 w-11/12 max-w-md">
+            <h3 class="text-xl font-bold mb-4">เพิ่มคำใหม่</h3>
+            <input type="text" id="new-word-input" class="w-full p-2 border rounded mb-4" placeholder="พิมพ์คำศัพท์ที่นี่">
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">ยกเลิก</button>
+                <button onclick="addNewWord()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="fixed bottom-4 right-4 flex space-x-3">
+        <button id="btn-add" class="px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg hover:bg-green-600 transition-all">
+            ➕ เพิ่มคำ
+        </button>
+        <button id="btn-mix" class="px-6 py-3 bg-purple-500 text-white rounded-lg shadow-lg hover:bg-purple-600 transition-all">
+            🔀 ผสมคำ
+        </button>
+        <button id="btn-cancel-mix" class="px-6 py-3 bg-yellow-500 text-white rounded-lg shadow-lg hover:bg-yellow-600 transition-all hidden">
+            ❌ ยกเลิกผสมคำ
+        </button>
+        <button id="btn-delete" class="px-6 py-3 bg-red-500 text-white rounded-lg shadow-lg hover:bg-red-600 transition-all">
+            🗑️ ลบ
+        </button>
+        <button id="btn-cancel-delete" class="px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg hover:bg-gray-600 transition-all hidden">
+            ❌ ยกเลิกลบคำ
+        </button>
+    </div>
+
+    <!-- Script -->
+    <script src="script.js"></script>
+</body>
+</html>
