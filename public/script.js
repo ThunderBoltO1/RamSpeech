@@ -138,17 +138,23 @@ async function loadCategoryData() {
 
 function renderButtons(words = []) {
     if (elements.buttonContainer) {
-        // สร้าง HTML สำหรับปุ่มคำศัพท์
-        elements.buttonContainer.innerHTML = words.map(word => `
+        elements.buttonContainer.innerHTML = words.map((word, index) => `
             <button class="word-button flex-1 text-center bg-blue-500 text-white text-4xl px-6 py-10 rounded-lg m-2 hover:bg-blue-600 transition-all"
-                    data-word="${word}" style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
+                    data-word="${word}" 
+                    data-index="${index}"
+                    draggable="true"
+                    style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
                 ${word}
                 ${isSelectMode ? `<span class="selection-indicator ml-2 text-green-500">${selectedWords.includes(word) ? '✔️' : ''}</span>` : ''}
             </button>
         `).join('');
         
-        // เพิ่ม event listeners หลังจากสร้าง DOM elements
-        document.querySelectorAll('.word-button').forEach(button => {
+        // Add drag and drop event listeners
+        const buttons = document.querySelectorAll('.word-button');
+        buttons.forEach(button => {
+            button.addEventListener('dragstart', handleDragStart);
+            button.addEventListener('dragover', handleDragOver);
+            button.addEventListener('drop', handleDrop);
             button.addEventListener('click', () => {
                 const word = button.getAttribute('data-word');
                 if (isSelectMode) {
@@ -159,6 +165,79 @@ function renderButtons(words = []) {
             });
         });
     }
+}
+
+// Add these new drag and drop handler functions
+function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.index);
+    e.target.classList.add('opacity-50');
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    const targetIndex = parseInt(e.target.closest('.word-button').dataset.index);
+    
+    // Remove opacity from dragged element
+    document.querySelector(`[data-index="${sourceIndex}"]`).classList.remove('opacity-50');
+    
+    if (sourceIndex === targetIndex) return;
+    
+    try {
+        await reorderWordsInSheet(sourceIndex, targetIndex);
+        // Reload the data after successful reordering
+        await loadCategoryData();
+    } catch (error) {
+        showError('ไม่สามารถเรียงลำดับคำใหม่ได้: ' + error.message);
+        console.error('Error reordering words:', error);
+    }
+}
+
+async function reorderWordsInSheet(sourceIndex, targetIndex) {
+    const sheetName = CATEGORY_SHEETS[currentCategory];
+    
+    // Get current data
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?majorDimension=COLUMNS`;
+    const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    
+    if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (!data.values || !data.values[0]) {
+        throw new Error('ไม่พบข้อมูลในชีท');
+    }
+    
+    // Reorder the array
+    const words = data.values[0];
+    const [movedWord] = words.splice(sourceIndex, 1);
+    words.splice(targetIndex, 0, movedWord);
+    
+    // Update the sheet with new order
+    const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}!A1:A${words.length}?valueInputOption=RAW`;
+    const updateResponse = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            values: words.map(word => [word])
+        })
+    });
+    
+    if (!updateResponse.ok) {
+        throw new Error(`ไม่สามารถอัปเดตลำดับได้: ${updateResponse.statusText}`);
+    }
+    
+    showToast('เรียงลำดับคำใหม่สำเร็จ');
 }
 
 // UI Functions
