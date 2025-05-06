@@ -1,7 +1,7 @@
 // Configuration
-const CLIENT_ID = '271962080875-dr9uild15rad3n86816nmfq5ms7mj95o.apps.googleusercontent.com';
-const REDIRECT_URI = 'https://speech-test-nine.vercel.app';
-const SPREADSHEET_ID = '1XuZ7o1fcZ6Y01buC6J9Aep_tU7H9XFLt8ZUVPPrp340';
+const CLIENT_ID = '271962080875-khc6aslq3phrnm9cqgguk37j0funtr7f.apps.googleusercontent.com';
+const REDIRECT_URI = 'https://ram-speech.vercel.app';
+const SPREADSHEET_ID = '1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const CATEGORY_SHEETS = {
     'ทั่วไป': 'common',
