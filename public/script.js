@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     handleAuthResponse();
+
+    // Initialize drag and drop
+    initDragAndDrop();
 });
 
 // Authentication Functions
