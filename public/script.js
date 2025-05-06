@@ -1,8 +1,8 @@
 // Configuration
-const CLIENT_ID = '271962080875-khc6aslq3phrnm9cqgguk37j0funtr7f.apps.googleusercontent.com';
-const REDIRECT_URI = 'https://ram-speech.vercel.app';
-const SPREADSHEET_ID = '1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/spreadsheets';
+const CLIENT_ID = '271962080875-dr9uild15rad3n86816nmfq5ms7mj95o.apps.googleusercontent.com';
+const REDIRECT_URI = 'https://speech-test-nine.vercel.app';
+const SPREADSHEET_ID = '1XuZ7o1fcZ6Y01buC6J9Aep_tU7H9XFLt8ZUVPPrp340';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const CATEGORY_SHEETS = {
     'ทั่วไป': 'common',
     'ความต้องการ': 'demand',
@@ -46,9 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     handleAuthResponse();
-
-    // Initialize drag and drop
-    initDragAndDrop();
 });
 
 // Authentication Functions
@@ -98,16 +95,8 @@ function authenticate() {
     const state = Math.random().toString(36).substring(2);
     localStorage.setItem('oauth_state', state);
     
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.append('client_id', CLIENT_ID);
-    authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
-    authUrl.searchParams.append('response_type', 'token');
-    authUrl.searchParams.append('scope', SCOPES);
-    authUrl.searchParams.append('state', state);
-    authUrl.searchParams.append('prompt', 'consent');
-    authUrl.searchParams.append('access_type', 'online');
-    
-    window.location.href = authUrl.toString();
+    const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${encodeURIComponent(SCOPES)}&state=${state}`;
+    window.location.href = authUrl;
 }
 
 // Data Functions
@@ -120,31 +109,17 @@ async function loadInitialData() {
 }
 
 async function loadCategoryData() {
-    if (!accessToken) {
-        console.error('No access token available');
-        authenticate();
-        return;
-    }
-
     const sheetName = CATEGORY_SHEETS[currentCategory];
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}!A:A?majorDimension=COLUMNS`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?majorDimension=COLUMNS`;
     
     try {
-        console.log('Fetching data from sheet:', sheetName);
         const response = await fetch(url, {
-            headers: { 
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${accessToken}` }
         });
-        
-        console.log('Response status:', response.status);
         
         if (!response.ok) {
             if (response.status === 401) {
-                console.error('Token expired or invalid');
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('token_expiry');
+                showError('การยืนยันตัวตนล้มเหลว กรุณาล็อกอินใหม่');
                 authenticate();
                 return;
             }
@@ -152,39 +127,27 @@ async function loadCategoryData() {
         }
         
         const data = await response.json();
-        console.log('Received data:', data);
-        
-        if (!data.values || !Array.isArray(data.values[0])) {
-            console.log('No data found in sheet');
-            renderButtons([]);
-            return;
-        }
-        
-        const filteredWords = data.values[0].filter(word => word && word.trim() !== '');
-        console.log('Filtered words:', filteredWords);
+        const filteredWords = data.values ? data.values[0].filter(word => word && word.trim() !== '') : [];
         renderButtons(filteredWords);
-        
     } catch (error) {
         console.error('Error loading category data:', error);
         showError('ไม่สามารถโหลดข้อมูลได้: ' + error.message);
-        renderButtons([]);
+        renderButtons([]); // Render an empty state if the sheet is empty or an error occurs
     }
 }
 
 function renderButtons(words = []) {
     if (elements.buttonContainer) {
-        elements.buttonContainer.innerHTML = words.map((word, index) => `
+        // สร้าง HTML สำหรับปุ่มคำศัพท์
+        elements.buttonContainer.innerHTML = words.map(word => `
             <button class="word-button flex-1 text-center bg-blue-500 text-white text-4xl px-6 py-10 rounded-lg m-2 hover:bg-blue-600 transition-all"
-                    data-word="${word}" 
-                    data-index="${index}"
-                    draggable="true"
-                    style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
+                    data-word="${word}" style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
                 ${word}
                 ${isSelectMode ? `<span class="selection-indicator ml-2 text-green-500">${selectedWords.includes(word) ? '✔️' : ''}</span>` : ''}
             </button>
         `).join('');
         
-        // Add click event listeners only
+        // เพิ่ม event listeners หลังจากสร้าง DOM elements
         document.querySelectorAll('.word-button').forEach(button => {
             button.addEventListener('click', () => {
                 const word = button.getAttribute('data-word');
@@ -196,91 +159,6 @@ function renderButtons(words = []) {
             });
         });
     }
-}
-
-// Add these new drag and drop handler functions
-function handleDragStart(e) {
-    e.dataTransfer.setData('text/plain', e.target.dataset.index);
-    e.target.classList.add('opacity-50');
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-}
-
-async function handleDrop(e) {
-    e.preventDefault();
-    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    const targetIndex = parseInt(e.target.closest('.word-button').dataset.index);
-    
-    // Remove opacity from dragged element
-    document.querySelector(`[data-index="${sourceIndex}"]`).classList.remove('opacity-50');
-    
-    if (sourceIndex === targetIndex) return;
-    
-    try {
-        // Get current buttons data
-        const buttons = Array.from(document.querySelectorAll('.word-button'));
-        const words = buttons.map(btn => btn.getAttribute('data-word'));
-        
-        // Reorder array optimistically
-        const [movedWord] = words.splice(sourceIndex, 1);
-        words.splice(targetIndex, 0, movedWord);
-        
-        // Update UI immediately
-        renderButtons(words);
-        
-        // Then update the server
-        await reorderWordsInSheet(sourceIndex, targetIndex);
-    } catch (error) {
-        // If server update fails, reload original data
-        showError('ไม่สามารถเรียงลำดับคำใหม่ได้: ' + error.message);
-        console.error('Error reordering words:', error);
-        await loadCategoryData();
-    }
-}
-
-async function reorderWordsInSheet(sourceIndex, targetIndex) {
-    const sheetName = CATEGORY_SHEETS[currentCategory];
-    
-    // Get current data
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?majorDimension=COLUMNS`;
-    const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-    
-    if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    if (!data.values || !data.values[0]) {
-        throw new Error('ไม่พบข้อมูลในชีท');
-    }
-    
-    // Reorder the array
-    const words = data.values[0];
-    const [movedWord] = words.splice(sourceIndex, 1);
-    words.splice(targetIndex, 0, movedWord);
-    
-    // Update the sheet with new order
-    const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}!A1:A${words.length}?valueInputOption=RAW`;
-    const updateResponse = await fetch(updateUrl, {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            values: words.map(word => [word])
-        })
-    });
-    
-    if (!updateResponse.ok) {
-        throw new Error(`ไม่สามารถอัปเดตลำดับได้: ${updateResponse.statusText}`);
-    }
-    
-    showToast('เรียงลำดับคำใหม่สำเร็จ');
 }
 
 // UI Functions
@@ -354,30 +232,30 @@ function updateMixResult(text = '') {
 
 // Speech Functions
 function speakText(text) {
-    if (typeof responsiveVoice === 'undefined') {
+    if (typeof responsiveVoice !== 'undefined') {
+        responsiveVoice.speak(text, "Thai Male", {
+            rate: 0.7, // Slow down the speech rate
+            pitch: 0.8, // Slightly lower pitch for a more mature tone
+            onstart: () => {
+                console.log('เริ่มพูด:', text);
+                highlightSpeakingButton(text);
+            },
+            onend: () => {
+                console.log('พูดเสร็จสิ้น:', text);
+                removeSpeakingHighlight();
+            },
+            onerror: (error) => {
+                console.error('เกิดข้อผิดพลาดในการพูด:', error);
+                showError('ไม่สามารถพูดข้อความได้');
+            }
+        });
+
+        // แสดงข้อความที่พูดบน mix-result
+        updateMixResult(text);
+    } else {
         console.error('ResponsiveVoice.js ไม่พร้อมใช้งาน');
         showError('ไม่สามารถพูดข้อความได้');
-        return;
     }
-
-    responsiveVoice.speak(text, "Thai Male", {
-        rate: 0.7,
-        pitch: 0.8,
-        onstart: () => {
-            console.log('เริ่มพูด:', text);
-            highlightSpeakingButton(text);
-        },
-        onend: () => {
-            console.log('พูดเสร็จสิ้น:', text);
-            removeSpeakingHighlight();
-        },
-        onerror: (error) => {
-            console.error('เกิดข้อผิดพลาดในการพูด:', error);
-            showError('ไม่สามารถพูดข้อความได้');
-        }
-    });
-
-    updateMixResult(text);
 }
 
 function highlightSpeakingButton(text) {
@@ -734,36 +612,4 @@ async function getSheetId(sheetName) {
     }
 
     return sheet.properties.sheetId;
-}
-
-import { DragAndDropManager } from './utils/dragAndDrop.js';
-
-function initDragAndDrop() {
-    const dragDropManager = new DragAndDropManager({
-        containerSelector: '#button-container',
-        itemSelector: '.word-button',
-        draggedItemClass: 'opacity-50',
-        onReorder: async (sourceIndex, targetIndex) => {
-            try {
-                // Get current buttons data
-                const buttons = Array.from(document.querySelectorAll('.word-button'));
-                const words = buttons.map(btn => btn.getAttribute('data-word'));
-                
-                // Reorder array optimistically
-                const [movedWord] = words.splice(sourceIndex, 1);
-                words.splice(targetIndex, 0, movedWord);
-                
-                // Update UI immediately
-                renderButtons(words);
-                
-                // Then update the server
-                await reorderWordsInSheet(sourceIndex, targetIndex);
-            } catch (error) {
-                showError('ไม่สามารถเรียงลำดับคำใหม่ได้: ' + error.message);
-                await loadCategoryData();
-            }
-        }
-    });
-
-    dragDropManager.init();
 }
