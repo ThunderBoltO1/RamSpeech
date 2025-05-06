@@ -8,6 +8,9 @@ const CATEGORY_SHEETS = {
     'ความต้องการ': 'demand',
     'คลัง': 'storage',
 };
+const WS_SERVER_URL = 'wss://your-websocket-server.com';
+let ws;
+let deviceId = localStorage.getItem('deviceId') || 'device1';
 
 // State
 let accessToken = null;
@@ -22,7 +25,8 @@ const elements = {
     buttonContainer: document.getElementById('button-container'),
     selectedWordsContainer: document.getElementById('selected-words-container'),
     mixResult: document.getElementById('mix-result'),
-    newWordInput: document.getElementById('new-word-input')
+    newWordInput: document.getElementById('new-word-input'),
+    deviceSelector: document.getElementById('device-selector')
 };
 
 // Event Listeners
@@ -45,6 +49,26 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelDeleteButton.addEventListener('click', cancelDeleteMode);
     }
 
+    // Add device selector to the header
+    const header = document.querySelector('header');
+    const deviceSelector = document.createElement('div');
+    deviceSelector.className = 'fixed top-4 right-4 z-50';
+    deviceSelector.innerHTML = `
+        <select id="device-selector" class="bg-white border border-gray-300 rounded px-3 py-2">
+            <option value="device1" ${deviceId === 'device1' ? 'selected' : ''}>เครื่อง 1</option>
+            <option value="device2" ${deviceId === 'device2' ? 'selected' : ''}>เครื่อง 2</option>
+        </select>
+    `;
+    header.appendChild(deviceSelector);
+
+    // Add device selector change handler
+    document.getElementById('device-selector').addEventListener('change', (e) => {
+        deviceId = e.target.value;
+        localStorage.setItem('deviceId', deviceId);
+        initWebSocket(); // Reconnect with new device ID
+    });
+
+    initWebSocket();
     handleAuthResponse();
 });
 
@@ -129,6 +153,7 @@ async function loadCategoryData() {
         const data = await response.json();
         const filteredWords = data.values ? data.values[0].filter(word => word && word.trim() !== '') : [];
         renderButtons(filteredWords);
+        initDragAndDrop(); // Add this line
     } catch (error) {
         console.error('Error loading category data:', error);
         showError('ไม่สามารถโหลดข้อมูลได้: ' + error.message);
@@ -149,12 +174,8 @@ function renderButtons(words = []) {
             </button>
         `).join('');
         
-        // Add drag and drop event listeners
-        const buttons = document.querySelectorAll('.word-button');
-        buttons.forEach(button => {
-            button.addEventListener('dragstart', handleDragStart);
-            button.addEventListener('dragover', handleDragOver);
-            button.addEventListener('drop', handleDrop);
+        // Add click event listeners only
+        document.querySelectorAll('.word-button').forEach(button => {
             button.addEventListener('click', () => {
                 const word = button.getAttribute('data-word');
                 if (isSelectMode) {
@@ -188,12 +209,24 @@ async function handleDrop(e) {
     if (sourceIndex === targetIndex) return;
     
     try {
+        // Get current buttons data
+        const buttons = Array.from(document.querySelectorAll('.word-button'));
+        const words = buttons.map(btn => btn.getAttribute('data-word'));
+        
+        // Reorder array optimistically
+        const [movedWord] = words.splice(sourceIndex, 1);
+        words.splice(targetIndex, 0, movedWord);
+        
+        // Update UI immediately
+        renderButtons(words);
+        
+        // Then update the server
         await reorderWordsInSheet(sourceIndex, targetIndex);
-        // Reload the data after successful reordering
-        await loadCategoryData();
     } catch (error) {
+        // If server update fails, reload original data
         showError('ไม่สามารถเรียงลำดับคำใหม่ได้: ' + error.message);
         console.error('Error reordering words:', error);
+        await loadCategoryData();
     }
 }
 
@@ -312,29 +345,43 @@ function updateMixResult(text = '') {
 // Speech Functions
 function speakText(text) {
     if (typeof responsiveVoice !== 'undefined') {
-        responsiveVoice.speak(text, "Thai Male", {
-            rate: 0.7, // Slow down the speech rate
-            pitch: 0.8, // Slightly lower pitch for a more mature tone
-            onstart: () => {
-                console.log('เริ่มพูด:', text);
-                highlightSpeakingButton(text);
-            },
-            onend: () => {
-                console.log('พูดเสร็จสิ้น:', text);
-                removeSpeakingHighlight();
-            },
-            onerror: (error) => {
-                console.error('เกิดข้อผิดพลาดในการพูด:', error);
-                showError('ไม่สามารถพูดข้อความได้');
-            }
-        });
-
-        // แสดงข้อความที่พูดบน mix-result
-        updateMixResult(text);
+        // Send to other devices
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'speak',
+                deviceId: deviceId,
+                text: text
+            }));
+        }
+        
+        // Speak locally
+        speakTextLocally(text);
     } else {
         console.error('ResponsiveVoice.js ไม่พร้อมใช้งาน');
         showError('ไม่สามารถพูดข้อความได้');
     }
+}
+
+// Add new function for local speech
+function speakTextLocally(text) {
+    responsiveVoice.speak(text, "Thai Male", {
+        rate: 0.7,
+        pitch: 0.8,
+        onstart: () => {
+            console.log('เริ่มพูด:', text);
+            highlightSpeakingButton(text);
+        },
+        onend: () => {
+            console.log('พูดเสร็จสิ้น:', text);
+            removeSpeakingHighlight();
+        },
+        onerror: (error) => {
+            console.error('เกิดข้อผิดพลาดในการพูด:', error);
+            showError('ไม่สามารถพูดข้อความได้');
+        }
+    });
+
+    updateMixResult(text);
 }
 
 function highlightSpeakingButton(text) {
@@ -691,4 +738,65 @@ async function getSheetId(sheetName) {
     }
 
     return sheet.properties.sheetId;
+}
+
+import { DragAndDropManager } from './utils/dragAndDrop.js';
+
+function initDragAndDrop() {
+    const dragDropManager = new DragAndDropManager({
+        containerSelector: '#button-container',
+        itemSelector: '.word-button',
+        draggedItemClass: 'opacity-50',
+        onReorder: async (sourceIndex, targetIndex) => {
+            try {
+                // Get current buttons data
+                const buttons = Array.from(document.querySelectorAll('.word-button'));
+                const words = buttons.map(btn => btn.getAttribute('data-word'));
+                
+                // Reorder array optimistically
+                const [movedWord] = words.splice(sourceIndex, 1);
+                words.splice(targetIndex, 0, movedWord);
+                
+                // Update UI immediately
+                renderButtons(words);
+                
+                // Then update the server
+                await reorderWordsInSheet(sourceIndex, targetIndex);
+            } catch (error) {
+                showError('ไม่สามารถเรียงลำดับคำใหม่ได้: ' + error.message);
+                await loadCategoryData();
+            }
+        }
+    });
+
+    dragDropManager.init();
+}
+
+// Add WebSocket initialization function
+function initWebSocket() {
+    if (ws) {
+        ws.close();
+    }
+
+    ws = new WebSocket(WS_SERVER_URL);
+    
+    ws.onopen = () => {
+        console.log('WebSocket Connected');
+        ws.send(JSON.stringify({
+            type: 'register',
+            deviceId: deviceId
+        }));
+    };
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'speak' && data.deviceId !== deviceId) {
+            speakTextLocally(data.text);
+        }
+    };
+    
+    ws.onclose = () => {
+        console.log('WebSocket Disconnected');
+        setTimeout(initWebSocket, 5000); // Attempt to reconnect
+    };
 }
