@@ -5,7 +5,7 @@ const SPREADSHEET_ID = '1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const CATEGORY_SHEETS = {
     'ทั่วไป': 'common',
-    'ความต้องการ': 'demand',
+    'ความต้องการ': 'need',
     'คลัง': 'storage',
 };
 
