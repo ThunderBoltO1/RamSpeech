@@ -675,5 +675,3 @@ class DragAndDropManager {
         container.removeEventListener('drop', this.handleDrop);
     }
 }
-
-export { DragAndDropManager };
