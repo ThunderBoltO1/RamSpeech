@@ -2,7 +2,7 @@
 const CLIENT_ID = '271962080875-khc6aslq3phrnm9cqgguk37j0funtr7f.apps.googleusercontent.com';
 const REDIRECT_URI = 'https://ram-speech.vercel.app';
 const SPREADSHEET_ID = '1YY1a1drCnfXrSNWrGBgrMaMlFQK5rzBOEoeMhW9MYm8';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/spreadsheets';
 const CATEGORY_SHEETS = {
     'ทั่วไป': 'common',
     'ความต้องการ': 'demand',
@@ -95,8 +95,16 @@ function authenticate() {
     const state = Math.random().toString(36).substring(2);
     localStorage.setItem('oauth_state', state);
     
-    const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${encodeURIComponent(SCOPES)}&state=${state}`;
-    window.location.href = authUrl;
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.append('client_id', CLIENT_ID);
+    authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+    authUrl.searchParams.append('response_type', 'token');
+    authUrl.searchParams.append('scope', SCOPES);
+    authUrl.searchParams.append('state', state);
+    authUrl.searchParams.append('prompt', 'consent');
+    authUrl.searchParams.append('access_type', 'online');
+    
+    window.location.href = authUrl.toString();
 }
 
 // Data Functions
@@ -116,16 +124,24 @@ async function loadCategoryData() {
     }
 
     const sheetName = CATEGORY_SHEETS[currentCategory];
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?majorDimension=COLUMNS`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}!A:A?majorDimension=COLUMNS`;
     
     try {
+        console.log('Fetching data from sheet:', sheetName);
         const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
+            headers: { 
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+            }
         });
+        
+        console.log('Response status:', response.status);
         
         if (!response.ok) {
             if (response.status === 401) {
                 console.error('Token expired or invalid');
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('token_expiry');
                 authenticate();
                 return;
             }
@@ -133,13 +149,22 @@ async function loadCategoryData() {
         }
         
         const data = await response.json();
-        const filteredWords = data.values ? data.values[0].filter(word => word && word.trim() !== '') : [];
+        console.log('Received data:', data);
+        
+        if (!data.values || !Array.isArray(data.values[0])) {
+            console.log('No data found in sheet');
+            renderButtons([]);
+            return;
+        }
+        
+        const filteredWords = data.values[0].filter(word => word && word.trim() !== '');
+        console.log('Filtered words:', filteredWords);
         renderButtons(filteredWords);
-        initDragAndDrop(); // Add this line
+        
     } catch (error) {
         console.error('Error loading category data:', error);
         showError('ไม่สามารถโหลดข้อมูลได้: ' + error.message);
-        renderButtons([]); // Render an empty state if the sheet is empty or an error occurs
+        renderButtons([]);
     }
 }
 
