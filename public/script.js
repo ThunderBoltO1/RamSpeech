@@ -22,8 +22,7 @@ const elements = {
     buttonContainer: document.getElementById('button-container'),
     selectedWordsContainer: document.getElementById('selected-words-container'),
     mixResult: document.getElementById('mix-result'),
-    newWordInput: document.getElementById('new-word-input'),
-    deviceSelector: document.getElementById('device-selector')
+    newWordInput: document.getElementById('new-word-input')
 };
 
 // Event Listeners
@@ -45,25 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cancelDeleteButton) {
         cancelDeleteButton.addEventListener('click', cancelDeleteMode);
     }
-
-    // Add device selector to the header
-    const header = document.querySelector('header');
-    const deviceSelector = document.createElement('div');
-    deviceSelector.className = 'fixed top-4 right-4 z-50';
-    deviceSelector.innerHTML = `
-        <select id="device-selector" class="bg-white border border-gray-300 rounded px-3 py-2">
-            <option value="device1" ${deviceId === 'device1' ? 'selected' : ''}>เครื่อง 1</option>
-            <option value="device2" ${deviceId === 'device2' ? 'selected' : ''}>เครื่อง 2</option>
-        </select>
-    `;
-    header.appendChild(deviceSelector);
-
-    // Add device selector change handler
-    document.getElementById('device-selector').addEventListener('change', (e) => {
-        deviceId = e.target.value;
-        localStorage.setItem('deviceId', deviceId);
-        initWebSocket(); // Reconnect with new device ID
-    });
 
     handleAuthResponse();
 });
