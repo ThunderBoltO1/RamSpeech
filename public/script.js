@@ -8,9 +8,6 @@ const CATEGORY_SHEETS = {
     'ความต้องการ': 'demand',
     'คลัง': 'storage',
 };
-const WS_SERVER_URL = 'wss://your-websocket-server.com';
-let ws;
-let deviceId = localStorage.getItem('deviceId') || 'device1';
 
 // State
 let accessToken = null;
@@ -68,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initWebSocket(); // Reconnect with new device ID
     });
 
-    initWebSocket();
     handleAuthResponse();
 });
 
@@ -133,6 +129,12 @@ async function loadInitialData() {
 }
 
 async function loadCategoryData() {
+    if (!accessToken) {
+        console.error('No access token available');
+        authenticate();
+        return;
+    }
+
     const sheetName = CATEGORY_SHEETS[currentCategory];
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?majorDimension=COLUMNS`;
     
@@ -143,7 +145,7 @@ async function loadCategoryData() {
         
         if (!response.ok) {
             if (response.status === 401) {
-                showError('การยืนยันตัวตนล้มเหลว กรุณาล็อกอินใหม่');
+                console.error('Token expired or invalid');
                 authenticate();
                 return;
             }
@@ -344,26 +346,12 @@ function updateMixResult(text = '') {
 
 // Speech Functions
 function speakText(text) {
-    if (typeof responsiveVoice !== 'undefined') {
-        // Send to other devices
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: 'speak',
-                deviceId: deviceId,
-                text: text
-            }));
-        }
-        
-        // Speak locally
-        speakTextLocally(text);
-    } else {
+    if (typeof responsiveVoice === 'undefined') {
         console.error('ResponsiveVoice.js ไม่พร้อมใช้งาน');
         showError('ไม่สามารถพูดข้อความได้');
+        return;
     }
-}
 
-// Add new function for local speech
-function speakTextLocally(text) {
     responsiveVoice.speak(text, "Thai Male", {
         rate: 0.7,
         pitch: 0.8,
@@ -770,33 +758,4 @@ function initDragAndDrop() {
     });
 
     dragDropManager.init();
-}
-
-// Add WebSocket initialization function
-function initWebSocket() {
-    if (ws) {
-        ws.close();
-    }
-
-    ws = new WebSocket(WS_SERVER_URL);
-    
-    ws.onopen = () => {
-        console.log('WebSocket Connected');
-        ws.send(JSON.stringify({
-            type: 'register',
-            deviceId: deviceId
-        }));
-    };
-    
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'speak' && data.deviceId !== deviceId) {
-            speakTextLocally(data.text);
-        }
-    };
-    
-    ws.onclose = () => {
-        console.log('WebSocket Disconnected');
-        setTimeout(initWebSocket, 5000); // Attempt to reconnect
-    };
 }
