@@ -1,0 +1,25 @@
+/* Drag and Drop Styles */
+.draggable {
+    cursor: grab;
+}
+
+.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    transform: scale(1.05);
+    z-index: 100;
+}
+
+.drag-over {
+    border: 2px dashed #4299e1;
+    transform: scale(1.02);
+    background-color: rgba(66, 153, 225, 0.1) !important;
+}
+
+.word-item {
+    transition: all 0.2s ease;
+}
+
+.drag-handle {
+    cursor: grab;
+}

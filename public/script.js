@@ -15,6 +15,8 @@ let tokenExpiry = null;
 let currentCategory = 'ทั่วไป';
 let selectedWords = [];
 let isSelectMode = false;
+let isDragMode = false;
+let categoryWords = {}; // Store words for each category
 
 // DOM Elements
 const elements = {
@@ -25,6 +27,10 @@ const elements = {
     newWordInput: document.getElementById('new-word-input')
 };
 
+// Drag and drop state
+let draggedItem = null;
+let draggedItemIndex = -1;
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.category-button').forEach(button => {
@@ -34,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-add').addEventListener('click', openModal);
     document.getElementById('btn-mix').addEventListener('click', toggleMixingMode);
     document.getElementById('btn-delete').addEventListener('click', deleteSelectedWord);
+    document.getElementById('btn-drag').addEventListener('click', toggleDragMode);
 
     const cancelMixButton = document.getElementById('btn-cancel-mix');
     if (cancelMixButton) {
@@ -43,6 +50,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelDeleteButton = document.getElementById('btn-cancel-delete');
     if (cancelDeleteButton) {
         cancelDeleteButton.addEventListener('click', cancelDeleteMode);
+    }
+
+    const cancelDragButton = document.getElementById('btn-cancel-drag');
+    if (cancelDragButton) {
+        cancelDragButton.addEventListener('click', cancelDragMode);
     }
 
     handleAuthResponse();
@@ -128,10 +140,13 @@ async function loadCategoryData() {
         
         const data = await response.json();
         const filteredWords = data.values ? data.values[0].filter(word => word && word.trim() !== '') : [];
+        // Store words for this category
+        categoryWords[currentCategory] = [...filteredWords];
         renderButtons(filteredWords);
     } catch (error) {
         console.error('Error loading category data:', error);
         showError('ไม่สามารถโหลดข้อมูลได้: ' + error.message);
+        categoryWords[currentCategory] = [];
         renderButtons([]); // Render an empty state if the sheet is empty or an error occurs
     }
 }
@@ -139,12 +154,15 @@ async function loadCategoryData() {
 function renderButtons(words = []) {
     if (elements.buttonContainer) {
         // สร้าง HTML สำหรับปุ่มคำศัพท์
-        elements.buttonContainer.innerHTML = words.map(word => `
-            <button class="word-button flex-1 text-center bg-blue-500 text-white text-4xl px-6 py-10 rounded-lg m-2 hover:bg-blue-600 transition-all"
-                    data-word="${word}" style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
-                ${word}
-                ${isSelectMode ? `<span class="selection-indicator ml-2 text-green-500">${selectedWords.includes(word) ? '✔️' : ''}</span>` : ''}
-            </button>
+        elements.buttonContainer.innerHTML = words.map((word, index) => `
+            <div class="word-item" data-index="${index}">
+                <button class="word-button flex-1 text-center bg-blue-500 text-white text-4xl px-6 py-10 rounded-lg m-2 hover:bg-blue-600 transition-all ${isDragMode ? 'draggable' : ''}"
+                        data-word="${word}" data-index="${index}" style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
+                    ${word}
+                    ${isSelectMode ? `<span class="selection-indicator ml-2 text-green-500">${selectedWords.includes(word) ? '✔️' : ''}</span>` : ''}
+                    ${isDragMode ? '<span class="drag-handle ml-2">↕️</span>' : ''}
+                </button>
+            </div>
         `).join('');
         
         // เพิ่ม event listeners หลังจากสร้าง DOM elements
@@ -153,10 +171,21 @@ function renderButtons(words = []) {
                 const word = button.getAttribute('data-word');
                 if (isSelectMode) {
                     toggleWordSelection(word);
-                } else {
+                } else if (!isDragMode) {
                     speakText(word);
                 }
             });
+            
+            // Add drag and drop event listeners if in drag mode
+            if (isDragMode) {
+                button.setAttribute('draggable', 'true');
+                button.addEventListener('dragstart', handleDragStart);
+                button.addEventListener('dragover', handleDragOver);
+                button.addEventListener('dragenter', handleDragEnter);
+                button.addEventListener('dragleave', handleDragLeave);
+                button.addEventListener('drop', handleDrop);
+                button.addEventListener('dragend', handleDragEnd);
+            }
         });
     }
 }
@@ -406,6 +435,185 @@ if (typeof responsiveVoice !== 'undefined') {
     responsiveVoice.setDefaultVoice("Thai Male");
 }
 
+// Drag and Drop Functions
+function handleDragStart(e) {
+    this.classList.add('dragging');
+    draggedItem = this;
+    draggedItemIndex = parseInt(this.getAttribute('data-index'));
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    this.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+async function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    if (draggedItem !== this) {
+        const targetIndex = parseInt(this.getAttribute('data-index'));
+        const words = categoryWords[currentCategory];
+        const draggedWord = words[draggedItemIndex];
+        
+        // Reorder the array
+        words.splice(draggedItemIndex, 1);
+        words.splice(targetIndex, 0, draggedWord);
+        
+        // Update the category words
+        categoryWords[currentCategory] = words;
+        
+        // Re-render the buttons
+        renderButtons(words);
+        
+        // Update the sheet
+        await updateSheetOrder(currentCategory, words);
+    }
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    document.querySelectorAll('.word-button').forEach(button => {
+        button.classList.remove('dragging');
+        button.classList.remove('drag-over');
+    });
+}
+
+async function updateSheetOrder(category, words) {
+    try {
+        showToast('กำลังบันทึกการเปลี่ยนแปลงลำดับ...');
+        
+        const sheetName = CATEGORY_SHEETS[category];
+        const sheetId = await getSheetId(sheetName);
+        
+        // Clear the sheet first
+        const clearRequest = {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "requests": [
+                    {
+                        "updateCells": {
+                            "range": {
+                                "sheetId": sheetId
+                            },
+                            "fields": "userEnteredValue"
+                        }
+                    }
+                ]
+            })
+        };
+        
+        const clearResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, clearRequest);
+        
+        if (!clearResponse.ok) {
+            throw new Error(`HTTP error! Status: ${clearResponse.status}`);
+        }
+        
+        // Now update with the new order
+        const updateRequest = {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "values": [words]
+            })
+        };
+        
+        const updateResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?valueInputOption=RAW`, updateRequest);
+        
+        if (!updateResponse.ok) {
+            throw new Error(`HTTP error! Status: ${updateResponse.status}`);
+        }
+        
+        showToast('บันทึกการเปลี่ยนแปลงลำดับเรียบร้อยแล้ว');
+    } catch (error) {
+        console.error('Error updating sheet order:', error);
+        showError('ไม่สามารถบันทึกการเปลี่ยนแปลงลำดับได้: ' + error.message);
+    }
+}
+
+function toggleDragMode() {
+    isDragMode = !isDragMode;
+    isSelectMode = false; // Exit select mode if active
+    
+    // Update UI
+    updateDragModeUI();
+    
+    // Re-render buttons to add or remove drag handles
+    renderButtons(categoryWords[currentCategory] || []);
+    
+    if (isDragMode) {
+        showToast('โหมดจัดเรียงลำดับเปิดใช้งานแล้ว ลากและวางคำเพื่อเปลี่ยนลำดับ');
+    } else {
+        showToast('ออกจากโหมดจัดเรียงลำดับแล้ว');
+    }
+}
+
+function updateDragModeUI() {
+    const dragButton = document.getElementById('btn-drag');
+    const cancelDragButton = document.getElementById('btn-cancel-drag');
+    
+    if (isDragMode) {
+        // Hide other action buttons
+        document.getElementById('btn-add').classList.add('hidden');
+        document.getElementById('btn-mix').classList.add('hidden');
+        document.getElementById('btn-delete').classList.add('hidden');
+        
+        // Show cancel drag button
+        dragButton.classList.add('hidden');
+        cancelDragButton.classList.remove('hidden');
+        
+        // Add drag mode indicator
+        const header = document.querySelector('header h1');
+        if (header) {
+            header.textContent = '🔄 โหมดจัดเรียงลำดับ';
+        }
+    } else {
+        // Show all action buttons
+        document.getElementById('btn-add').classList.remove('hidden');
+        document.getElementById('btn-mix').classList.remove('hidden');
+        document.getElementById('btn-delete').classList.remove('hidden');
+        document.getElementById('btn-drag').classList.remove('hidden');
+        
+        // Hide cancel drag button
+        cancelDragButton.classList.add('hidden');
+        
+        // Reset header text
+        const header = document.querySelector('header h1');
+        if (header) {
+            header.textContent = 'ระบบสื่อสารด้วยเสียง';
+        }
+    }
+}
+
+function cancelDragMode() {
+    isDragMode = false;
+    updateDragModeUI();
+    renderButtons(categoryWords[currentCategory] || []);
+    showToast('ยกเลิกโหมดจัดเรียงลำดับแล้ว');
+}
+
 // Add New Word
 async function addNewWord() {
     const newWord = elements.newWordInput.value.trim();
@@ -496,6 +704,9 @@ function cancelDeleteMode() {
 
 // Add event listener for the cancel delete button
 document.getElementById('btn-cancel-delete').addEventListener('click', cancelDeleteMode);
+
+// Add event listener for the cancel drag button
+document.getElementById('btn-cancel-drag').addEventListener('click', cancelDragMode);
 
 async function deleteSelectedWord() {
     if (!isSelectMode) {
@@ -612,66 +823,4 @@ async function getSheetId(sheetName) {
     }
 
     return sheet.properties.sheetId;
-}
-
-
-class DragAndDropManager {
-    constructor(options = {}) {
-        this.containerSelector = options.containerSelector || '.draggable-container';
-        this.itemSelector = options.itemSelector || '.draggable-item';
-        this.onReorder = options.onReorder || (() => {});
-        this.draggedItemClass = options.draggedItemClass || 'opacity-50';
-    }
-
-    init() {
-        const container = document.querySelector(this.containerSelector);
-        if (!container) return;
-
-        container.addEventListener('dragstart', this.handleDragStart.bind(this));
-        container.addEventListener('dragover', this.handleDragOver.bind(this));
-        container.addEventListener('drop', this.handleDrop.bind(this));
-    }
-
-    handleDragStart(e) {
-        const item = e.target.closest(this.itemSelector);
-        if (!item) return;
-
-        e.dataTransfer.setData('text/plain', item.dataset.index);
-        item.classList.add(this.draggedItemClass);
-    }
-
-    handleDragOver(e) {
-        e.preventDefault();
-    }
-
-    async handleDrop(e) {
-        e.preventDefault();
-        const item = e.target.closest(this.itemSelector);
-        if (!item) return;
-
-        const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
-        const targetIndex = parseInt(item.dataset.index);
-
-        // Remove opacity from dragged element
-        document.querySelector(`${this.itemSelector}[data-index="${sourceIndex}"]`)
-            ?.classList.remove(this.draggedItemClass);
-
-        if (sourceIndex === targetIndex) return;
-
-        try {
-            await this.onReorder(sourceIndex, targetIndex);
-        } catch (error) {
-            console.error('Error during reorder:', error);
-            throw error;
-        }
-    }
-
-    destroy() {
-        const container = document.querySelector(this.containerSelector);
-        if (!container) return;
-
-        container.removeEventListener('dragstart', this.handleDragStart);
-        container.removeEventListener('dragover', this.handleDragOver);
-        container.removeEventListener('drop', this.handleDrop);
-    }
-}
+} b
