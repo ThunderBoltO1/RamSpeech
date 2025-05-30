@@ -466,22 +466,26 @@ async function handleDrop(e) {
     }
     
     if (draggedItem !== this) {
-        const targetIndex = parseInt(this.getAttribute('data-index'));
-        const words = categoryWords[currentCategory];
-        const draggedWord = words[draggedItemIndex];
+        const targetButton = this;
+        const draggedWord = draggedItem.getAttribute('data-word');
+        const targetWord = targetButton.getAttribute('data-word');
         
-        // Reorder the array
-        words.splice(draggedItemIndex, 1);
-        words.splice(targetIndex, 0, draggedWord);
-        
-        // Update the category words
-        categoryWords[currentCategory] = words;
-        
-        // Re-render the buttons
-        renderButtons(words);
-        
-        // Update the sheet
-        await updateSheetOrder(currentCategory, words);
+        // Only proceed if both words are in the selected words array
+        if (selectedWords.includes(draggedWord) && selectedWords.includes(targetWord)) {
+            // Get the current indices in the selectedWords array
+            const draggedSelectedIndex = selectedWords.indexOf(draggedWord);
+            const targetSelectedIndex = selectedWords.indexOf(targetWord);
+            
+            // Reorder within the selectedWords array
+            selectedWords.splice(draggedSelectedIndex, 1);
+            selectedWords.splice(targetSelectedIndex, 0, draggedWord);
+            
+            // Update the selection UI
+            updateSelectionUI();
+            
+            // Show toast message
+            showToast('เปลี่ยนลำดับคำที่เลือกเรียบร้อยแล้ว');
+        }
     }
     
     return false;
@@ -554,25 +558,31 @@ async function updateSheetOrder(category, words) {
 }
 
 function toggleDragMode() {
-    isDragMode = !isDragMode;
-    isSelectMode = false; // Exit select mode if active
+    // First enter selection mode if not already in it
+    if (!isSelectMode) {
+        isSelectMode = true;
+        updateSelectionUI();
+        showToast('กรุณาเลือกคำที่ต้องการจัดเรียงลำดับ');
+        renderButtons(categoryWords[currentCategory] || []);
+        return;
+    }
     
-    // Update UI
-    updateDragModeUI();
-    
-    // Re-render buttons to add or remove drag handles
-    renderButtons(categoryWords[currentCategory] || []);
-    
-    if (isDragMode) {
+    // If already in selection mode and some words are selected, enter drag mode
+    if (selectedWords.length > 0) {
+        isDragMode = true;
+        updateDragModeUI();
+        renderButtons(categoryWords[currentCategory] || []);
         showToast('โหมดจัดเรียงลำดับเปิดใช้งานแล้ว ลากและวางคำเพื่อเปลี่ยนลำดับ');
     } else {
-        showToast('ออกจากโหมดจัดเรียงลำดับแล้ว');
+        // If no words are selected, show a message
+        showToast('กรุณาเลือกคำที่ต้องการจัดเรียงลำดับก่อน');
     }
 }
 
 function updateDragModeUI() {
     const dragButton = document.getElementById('btn-drag');
     const cancelDragButton = document.getElementById('btn-cancel-drag');
+    const saveOrderButton = document.getElementById('btn-save-order');
     
     if (isDragMode) {
         // Hide other action buttons
@@ -580,9 +590,25 @@ function updateDragModeUI() {
         document.getElementById('btn-mix').classList.add('hidden');
         document.getElementById('btn-delete').classList.add('hidden');
         
-        // Show cancel drag button
+        // Show cancel drag button and save order button
         dragButton.classList.add('hidden');
         cancelDragButton.classList.remove('hidden');
+        
+        // Create save order button if it doesn't exist
+        if (!saveOrderButton) {
+            const saveBtn = document.createElement('button');
+            saveBtn.id = 'btn-save-order';
+            saveBtn.className = 'px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg hover:bg-green-600 transition-all';
+            saveBtn.innerHTML = '💾 บันทึกลำดับ';
+            saveBtn.addEventListener('click', saveSelectedWordsOrder);
+            
+            const buttonContainer = document.querySelector('.fixed.bottom-4.right-4');
+            if (buttonContainer) {
+                buttonContainer.appendChild(saveBtn);
+            }
+        } else {
+            saveOrderButton.classList.remove('hidden');
+        }
         
         // Add drag mode indicator
         const header = document.querySelector('header h1');
@@ -596,8 +622,11 @@ function updateDragModeUI() {
         document.getElementById('btn-delete').classList.remove('hidden');
         document.getElementById('btn-drag').classList.remove('hidden');
         
-        // Hide cancel drag button
+        // Hide cancel drag button and save order button
         cancelDragButton.classList.add('hidden');
+        if (saveOrderButton) {
+            saveOrderButton.classList.add('hidden');
+        }
         
         // Reset header text
         const header = document.querySelector('header h1');
@@ -609,6 +638,8 @@ function updateDragModeUI() {
 
 function cancelDragMode() {
     isDragMode = false;
+    isSelectMode = false;
+    selectedWords = [];
     updateDragModeUI();
     renderButtons(categoryWords[currentCategory] || []);
     showToast('ยกเลิกโหมดจัดเรียงลำดับแล้ว');
@@ -707,6 +738,62 @@ document.getElementById('btn-cancel-delete').addEventListener('click', cancelDel
 
 // Add event listener for the cancel drag button
 document.getElementById('btn-cancel-drag').addEventListener('click', cancelDragMode);
+
+// Function to save the order of selected words to the sheet
+async function saveSelectedWordsOrder() {
+    if (selectedWords.length === 0) {
+        showToast('ไม่มีคำที่เลือกไว้สำหรับจัดเรียง');
+        return;
+    }
+    
+    try {
+        showToast('กำลังบันทึกการเปลี่ยนแปลงลำดับ...');
+        
+        const sheetName = CATEGORY_SHEETS[currentCategory];
+        const allWords = categoryWords[currentCategory];
+        
+        // Create a new array with the selected words removed
+        const nonSelectedWords = allWords.filter(word => !selectedWords.includes(word));
+        
+        // Create the final array with selected words in their new order
+        const finalWordOrder = [...nonSelectedWords, ...selectedWords];
+        
+        // Update the sheet with the new order
+        const updateRequest = {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "values": [finalWordOrder]
+            })
+        };
+        
+        const updateResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?valueInputOption=RAW`, updateRequest);
+        
+        if (!updateResponse.ok) {
+            throw new Error(`HTTP error! Status: ${updateResponse.status}`);
+        }
+        
+        // Update local data
+        categoryWords[currentCategory] = finalWordOrder;
+        
+        // Exit drag mode
+        isDragMode = false;
+        isSelectMode = false;
+        selectedWords = [];
+        
+        // Update UI
+        updateDragModeUI();
+        renderButtons(finalWordOrder);
+        
+        showToast('บันทึกการเปลี่ยนแปลงลำดับเรียบร้อยแล้ว');
+    } catch (error) {
+        console.error('Error updating sheet order:', error);
+        showError('ไม่สามารถบันทึกการเปลี่ยนแปลงลำดับได้: ' + error.message);
+    }
+}
 
 async function deleteSelectedWord() {
     if (!isSelectMode) {
