@@ -9,14 +9,16 @@ const CATEGORY_SHEETS = {
     'คลัง': 'storage',
 };
 
-// State
+// Variables
 let accessToken = null;
-let tokenExpiry = null;
 let currentCategory = 'ทั่วไป';
+let categoryWords = {};
 let selectedWords = [];
 let isSelectMode = false;
-let isDragMode = false;
-let categoryWords = {}; // Store words for each category
+let isDragMode = true; // Set default drag mode to true
+let draggedItem = null;
+let draggedItemIndex = null;
+let isDeleteMode = false; 
 
 // DOM Elements
 const elements = {
@@ -27,9 +29,7 @@ const elements = {
     newWordInput: document.getElementById('new-word-input')
 };
 
-// Drag and drop state
-let draggedItem = null;
-let draggedItemIndex = -1;
+// Drag and drop state is already defined above
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -153,14 +153,14 @@ async function loadCategoryData() {
 
 function renderButtons(words = []) {
     if (elements.buttonContainer) {
-        // สร้าง HTML สำหรับปุ่มคำศัพท์
+        // สร้าง HTML สำหรับปุ่มคำศัพท์ในแนวตั้ง
         elements.buttonContainer.innerHTML = words.map((word, index) => `
             <div class="word-item" data-index="${index}">
-                <button class="word-button flex-1 text-center bg-blue-500 text-white text-4xl px-6 py-10 rounded-lg m-2 hover:bg-blue-600 transition-all ${isDragMode ? 'draggable' : ''}"
-                        data-word="${word}" data-index="${index}" style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal;">
+                <button class="word-button flex-1 text-center bg-blue-500 text-white text-4xl px-6 py-10 rounded-lg m-2 hover:bg-blue-600 transition-all draggable"
+                        data-word="${word}" data-index="${index}" draggable="true" style="font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 2.5rem; line-height: 1.5; word-wrap: break-word; white-space: normal; width: 100%;">
                     ${word}
                     ${isSelectMode ? `<span class="selection-indicator ml-2 text-green-500">${selectedWords.includes(word) ? '✔️' : ''}</span>` : ''}
-                    ${isDragMode ? '<span class="drag-handle ml-2">↕️</span>' : ''}
+                    <span class="drag-handle ml-2">↕️</span>
                 </button>
             </div>
         `).join('');
@@ -176,16 +176,13 @@ function renderButtons(words = []) {
                 }
             });
             
-            // Add drag and drop event listeners if in drag mode
-            if (isDragMode) {
-                button.setAttribute('draggable', 'true');
-                button.addEventListener('dragstart', handleDragStart);
-                button.addEventListener('dragover', handleDragOver);
-                button.addEventListener('dragenter', handleDragEnter);
-                button.addEventListener('dragleave', handleDragLeave);
-                button.addEventListener('drop', handleDrop);
-                button.addEventListener('dragend', handleDragEnd);
-            }
+            // Add drag and drop event listeners to all buttons by default
+            button.addEventListener('dragstart', handleDragStart);
+            button.addEventListener('dragover', handleDragOver);
+            button.addEventListener('dragenter', handleDragEnter);
+            button.addEventListener('dragleave', handleDragLeave);
+            button.addEventListener('drop', handleDrop);
+            button.addEventListener('dragend', handleDragEnd);
         });
     }
 }
@@ -262,7 +259,7 @@ function updateMixResult(text = '') {
 // Speech Functions
 function speakText(text) {
     if (typeof responsiveVoice !== 'undefined') {
-        responsiveVoice.speak(text, "Thai Male", {
+        responsiveVoice.speak(text, "Thai Male", "English  Male", {
             rate: 0.7, // Slow down the speech rate
             pitch: 0.8, // Slightly lower pitch for a more mature tone
             onstart: () => {
@@ -432,8 +429,10 @@ function showToast(message) {
 
 // Initialize
 if (typeof responsiveVoice !== 'undefined') {
-    responsiveVoice.setDefaultVoice("Thai Male");
+    responsiveVoice.setDefaultVoice("Thai Male , English Male");
 }
+
+// Drag mode is already enabled by default
 
 // Drag and Drop Functions
 function handleDragStart(e) {
@@ -558,74 +557,54 @@ async function updateSheetOrder(category, words) {
 }
 
 function toggleDragMode() {
-    // First enter selection mode if not already in it
+    // Since drag mode is now always enabled, this function just toggles selection mode
     if (!isSelectMode) {
         isSelectMode = true;
         updateSelectionUI();
         showToast('กรุณาเลือกคำที่ต้องการจัดเรียงลำดับ');
         renderButtons(categoryWords[currentCategory] || []);
-        return;
-    }
-    
-    // If already in selection mode and some words are selected, enter drag mode
-    if (selectedWords.length > 0) {
-        isDragMode = true;
-        updateDragModeUI();
-        renderButtons(categoryWords[currentCategory] || []);
-        showToast('โหมดจัดเรียงลำดับเปิดใช้งานแล้ว ลากและวางคำเพื่อเปลี่ยนลำดับ');
     } else {
-        // If no words are selected, show a message
-        showToast('กรุณาเลือกคำที่ต้องการจัดเรียงลำดับก่อน');
+        // If already in selection mode, just save the order
+        if (selectedWords.length > 0) {
+            saveSelectedWordsOrder();
+        } else {
+            // If no words are selected, show a message
+            showToast('กรุณาเลือกคำที่ต้องการจัดเรียงลำดับก่อน');
+        }
     }
 }
 
 function updateDragModeUI() {
+    // Since drag mode is always enabled, this function now mainly handles selection mode UI
     const dragButton = document.getElementById('btn-drag');
     const cancelDragButton = document.getElementById('btn-cancel-drag');
-    const saveOrderButton = document.getElementById('btn-save-order');
+    const saveOrderButton = document.getElementById('btn-save-order') || document.createElement('button');
     
-    if (isDragMode) {
-        // Hide other action buttons
-        document.getElementById('btn-add').classList.add('hidden');
-        document.getElementById('btn-mix').classList.add('hidden');
-        document.getElementById('btn-delete').classList.add('hidden');
-        
-        // Show cancel drag button and save order button
-        dragButton.classList.add('hidden');
-        cancelDragButton.classList.remove('hidden');
-        
-        // Create save order button if it doesn't exist
-        if (!saveOrderButton) {
-            const saveBtn = document.createElement('button');
-            saveBtn.id = 'btn-save-order';
-            saveBtn.className = 'px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg hover:bg-green-600 transition-all';
-            saveBtn.innerHTML = '💾 บันทึกลำดับ';
-            saveBtn.addEventListener('click', saveSelectedWordsOrder);
+    if (isSelectMode) {
+        // Show save order button
+        if (!document.getElementById('btn-save-order')) {
+            saveOrderButton.id = 'btn-save-order';
+            saveOrderButton.className = 'px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg hover:bg-green-600 transition-all';
+            saveOrderButton.innerHTML = '💾 บันทึกลำดับ';
+            saveOrderButton.addEventListener('click', saveSelectedWordsOrder);
             
             const buttonContainer = document.querySelector('.fixed.bottom-4.right-4');
             if (buttonContainer) {
-                buttonContainer.appendChild(saveBtn);
+                buttonContainer.appendChild(saveOrderButton);
             }
         } else {
             saveOrderButton.classList.remove('hidden');
         }
         
-        // Add drag mode indicator
+        // Add selection mode indicator
         const header = document.querySelector('header h1');
         if (header) {
-            header.textContent = '🔄 โหมดจัดเรียงลำดับ';
+            header.textContent = '✅ โหมดเลือกคำ';
         }
     } else {
-        // Show all action buttons
-        document.getElementById('btn-add').classList.remove('hidden');
-        document.getElementById('btn-mix').classList.remove('hidden');
-        document.getElementById('btn-delete').classList.remove('hidden');
-        document.getElementById('btn-drag').classList.remove('hidden');
-        
-        // Hide cancel drag button and save order button
-        cancelDragButton.classList.add('hidden');
-        if (saveOrderButton) {
-            saveOrderButton.classList.add('hidden');
+        // Hide save order button if it exists
+        if (document.getElementById('btn-save-order')) {
+            document.getElementById('btn-save-order').classList.add('hidden');
         }
         
         // Reset header text
@@ -637,7 +616,7 @@ function updateDragModeUI() {
 }
 
 function cancelDragMode() {
-    isDragMode = false;
+    // Drag mode is always enabled now, just cancel selection mode
     isSelectMode = false;
     selectedWords = [];
     updateDragModeUI();
