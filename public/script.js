@@ -237,6 +237,12 @@ function updateMixResult(text = '') {
     }
 }
 
+// Function to detect if text contains Thai characters
+function isThaiText(text) {
+    const thaiRegex = /[ก-๛]/;
+    return thaiRegex.test(text);
+}
+
 // Speech Functions
 function speakText(text) {
     try {
@@ -244,20 +250,29 @@ function speakText(text) {
             // Highlight the speaking button
             highlightSpeakingButton(text);
             
-            // Speak the text with English voice
-            responsiveVoice.speak(text, "UK English Male", "Thai Male", {
+            // Determine language and set appropriate voice
+            const isThai = isThaiText(text);
+            const voice = isThai ? 'Thai Female' : 'UK English Male';
+            
+            // Speak the text with appropriate voice
+            responsiveVoice.speak(text, voice, {
                 onend: removeSpeakingHighlight,
                 onerror: (error) => {
                     console.error('Speech error:', error);
                     removeSpeakingHighlight();
-                }
+                },
+                // Adjust voice parameters for better quality
+                rate: isThai ? 0.9 : 1.0,
+                pitch: isThai ? 1.1 : 1.0,
+                volume: 1.0
             });
         } else {
             console.warn('ResponsiveVoice not available');
             // Fallback to Web Speech API if available
             if ('speechSynthesis' in window) {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'en-US';
+                // Set language based on text
+                utterance.lang = isThaiText(text) ? 'th-TH' : 'en-US';
                 utterance.onend = removeSpeakingHighlight;
                 speechSynthesis.speak(utterance);
             }
@@ -411,9 +426,14 @@ function showToast(message) {
     }, 3000);
 }
 
-// Initialize
+// Initialize voices
 if (typeof responsiveVoice !== 'undefined') {
-    responsiveVoice.setDefaultVoice("UK English Male", "Thai Male");
+    // Set default voices for both languages
+    responsiveVoice.setDefaultVoice("UK English Male");
+    responsiveVoice.setDefaultVoice("Thai Female");
+    
+    // Enable cross-origin requests for better voice support
+    responsiveVoice.enableWindowClickSync();
 }
 
 // Add New Word
