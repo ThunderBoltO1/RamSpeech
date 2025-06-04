@@ -245,7 +245,7 @@ function speakText(text) {
             highlightSpeakingButton(text);
             
             // Speak the text with English voice
-            responsiveVoice.speak(text, "UK English Male", {
+            responsiveVoice.speak(text, "UK English Male", "Thai Male", {
                 onend: removeSpeakingHighlight,
                 onerror: (error) => {
                     console.error('Speech error:', error);
@@ -413,7 +413,7 @@ function showToast(message) {
 
 // Initialize
 if (typeof responsiveVoice !== 'undefined') {
-    responsiveVoice.setDefaultVoice("UK English Male");
+    responsiveVoice.setDefaultVoice("UK English Male", "Thai Male");
 }
 
 // Add New Word
@@ -678,4 +678,4 @@ async function getSheetId(sheetName) {
     }
 
     return sheet.properties.sheetId;
-} b
+}

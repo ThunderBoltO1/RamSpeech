@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech test</title>
+    <title>English Speech Assistant</title>
     
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -27,10 +27,10 @@
 
     <!-- Header -->
     <header class="bg-blue-600 text-white py-4 shadow-lg">
-        <h1 class="text-2xl font-bold text-center">ระบบสื่อสารด้วยเสียง</h1>
+        <h1 class="text-2xl font-bold text-center">English Speech Assistant</h1>
         <div class="flex justify-center items-center mt-2">
             <div id="mix-result" class="bg-blue-700 text-white text-2xl font-bold px-6 py-8 rounded-lg mx-2 shadow-lg">
-                ยังไม่ได้เลือกคำ
+                No words selected
             </div>
             <div id="mix-controls" class="flex space-x-2"></div>
         </div>
@@ -40,13 +40,13 @@
     <nav class="bg-white shadow-md py-4">
         <div class="flex justify-center space-x-4">
             <button data-category="ทั่วไป" class="category-button text-xl px-6 py-4 rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 transition-all">
-                ทั่วไป
+                Common
             </button>
             <button data-category="ความต้องการ" class="category-button text-xl px-6 py-4 rounded-lg bg-green-100 text-green-800 hover:bg-green-200 transition-all">
-                ความต้องการ
+                Needs
             </button>
             <button data-category="คลัง" class="category-button text-xl px-6 py-4 rounded-lg bg-purple-100 text-purple-800 hover:bg-purple-200 transition-all">
-                คลังคำ
+                Storage
             </button>
         </div>
     </nav>
@@ -60,11 +60,11 @@
     <!-- Modals -->
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
         <div class="bg-white rounded-lg p-6 w-11/12 max-w-md">
-            <h3 class="text-xl font-bold mb-4">เพิ่มคำใหม่</h3>
-            <input type="text" id="new-word-input" class="w-full p-2 border rounded mb-4" placeholder="พิมพ์คำศัพท์ที่นี่">
+            <h3 class="text-xl font-bold mb-4">Add New Word</h3>
+            <input type="text" id="new-word-input" class="w-full p-2 border rounded mb-4" placeholder="Type word here">
             <div class="flex justify-end space-x-3">
-                <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">ยกเลิก</button>
-                <button onclick="addNewWord()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">บันทึก</button>
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
+                <button onclick="addNewWord()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Save</button>
             </div>
         </div>
     </div>
@@ -72,25 +72,19 @@
     <!-- Floating Action Buttons -->
     <div class="fixed bottom-4 right-4 flex space-x-3">
         <button id="btn-add" class="px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg hover:bg-green-600 transition-all">
-            ➕ เพิ่มคำ
+            ➕ Add Word
         </button>
         <button id="btn-mix" class="px-6 py-3 bg-purple-500 text-white rounded-lg shadow-lg hover:bg-purple-600 transition-all">
-            🔀 ผสมคำ
+            🔀 Mix Words
         </button>
         <button id="btn-cancel-mix" class="px-6 py-3 bg-yellow-500 text-white rounded-lg shadow-lg hover:bg-yellow-600 transition-all hidden">
-            ❌ ยกเลิกผสมคำ
+            ❌ Cancel Mix
         </button>
         <button id="btn-delete" class="px-6 py-3 bg-red-500 text-white rounded-lg shadow-lg hover:bg-red-600 transition-all">
-            🗑️ ลบ
+            🗑️ Delete
         </button>
         <button id="btn-cancel-delete" class="px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg hover:bg-gray-600 transition-all hidden">
-            ❌ ยกเลิกลบคำ
-        </button>
-        <button id="btn-drag" class="px-6 py-3 bg-blue-500 text-white rounded-lg shadow-lg hover:bg-blue-600 transition-all">
-            ↕️ จัดเรียง
-        </button>
-        <button id="btn-cancel-drag" class="px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg hover:bg-gray-600 transition-all hidden">
-            ❌ ยกเลิกจัดเรียง
+            ❌ Cancel Delete
         </button>
     </div>
 
